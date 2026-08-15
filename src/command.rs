@@ -45,9 +45,10 @@ macro_rules! usage {
     };
 }
 
-#[inline]
 fn usage() {
-    eprintln!("usage: doas [--version] [-Lnsv] [-C config] [-u user] command [arg ...]");
+    eprintln!("usage: doas [-Lnsv] [-C config] [-u user] command [arg ...]");
+    eprintln!("usage: doas vidoas");
+    eprintln!("usage: doas [--version]");
 }
 
 impl CmdArgs {
