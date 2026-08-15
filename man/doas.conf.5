@@ -1,0 +1,255 @@
+.Dd $Mdocdate: May 29 2026 $
+.Dt DOAS.CONF 5
+.Os 
+.Sh NAME
+.Nm doas.conf
+.Nd doas configuration file
+.Sh DESCRIPTION
+The 
+.Xr doas 1
+utility executes commands as other users according to the rules in the 
+.Nm 
+configuration file.
+.Pp
+The rules have the following format:
+.Pp
+.Bl -tag -compact -width 4n
+.It
+.Ic permit Ns | Ns Ic deny
+.Op Ar options
+.Ar identity
+.Oo
+.Ic as
+.Ar target
+.Oc
+.Oo
+.Ic cmd
+.Ar command
+.Oo
+.Ic args
+.Oo
+.Ar argument ...
+.Oc
+.Oc
+.Oc
+.Pp
+.El
+Rules consist of the following parts:
+.Pp
+.Ic permit Ns | Ns Ic deny
+.Bl -tag -compact -width 4n
+.It
+The action to be taken if this rule matches.
+.Pp
+.El
+.Ar options
+.Bl -tag -compact -width 4n
+.It
+Options are:
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic nopass
+.El
+.Bl -tag -compact -width 8n
+.It
+The user is not required to enter a password.
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic nolog
+.El
+.Bl -tag -compact -width 8n
+.It
+Do not log successful command execution to 
+.Xr syslogd 8 .
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic persist
+.Op Ic { Ar duration Ic }
+.El
+.Bl -tag -compact -width 8n
+.It
+After the user successfully authenticates, do not ask for a password again for 5 minutes. 
+.br 
+The 
+.Ar duration
+may be specified as a number followed by 
+.Ic m
+for minutes or 
+.Ic s
+for seconds.
+For example, 
+.Ic persist { 5m }
+keeps the authentication valid for 5 minutes,
+while 
+.Ic persist { 120s }
+keeps it valid for 120 seconds.
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic pwfeedback
+.El
+.Bl -tag -compact -width 8n
+.It
+Provide visual feedback while the user is entering a password.
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic keepenv
+.El
+.Bl -tag -compact -width 8n
+.It
+Environment variables other than those listed in 
+.Xr doas 1
+are retained when creating the environment for the new process.
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+.Ic setenv {
+.Oo
+.Ar variable ...
+.Oc
+.Oo
+.Ar variable=value ...
+.Oc
+.Ic }
+.El
+.Bl -tag -compact -width 8n
+.It
+Keep or set the space-separated specified variables.
+Variables may also be removed with a leading 
+.Sq -
+or set using the latter syntax.
+If the first character of 
+.Ar value
+is a 
+.Ql $
+then the value to be set is taken from
+the existing environment variable of the indicated name.
+This option is processed after the default environment has been created.
+.Pp
+.El
+.Ar identity
+.Bl -tag -compact -width 4n
+.It
+The username to match.
+Groups may be specified by prepending a colon 
+.Pq Sq \&: .
+Numeric IDs are also accepted.
+.Pp
+.El
+.Ic as
+.Ar target
+.Bl -tag -compact -width 4n
+.It
+The target user the running user is allowed to run the command as. The default is all users.
+.Pp
+.El
+.Ic cmd
+.Ar command
+.Bl -tag -compact -width 4n
+.It
+The command the user is allowed or denied to run. The default is all commands.
+Be advised that it is best to specify absolute paths.
+If a relative path is specified, only a restricted 
+.Ev PATH
+will be searched.
+.Pp
+.El
+.Ic args
+.Oo
+.Ar argument ...
+.Oc
+.Bl -tag -compact -width 4n
+.It
+Arguments to command.
+The command arguments provided by the user need to match those specified.
+The keyword 
+.Ic args
+alone means that command must be run without any arguments.
+.Pp
+.El
+The last matching rule determines the action taken. If no rule matches, the action is denied.
+Comments can be put anywhere in the file using a hash mark 
+.Pq Sq # ,
+and extend to the end of the current line.
+.Pp
+The following quoting rules apply:
+.Bl -bullet -compact
+.It
+The text between a pair of double quotes 
+.Pq Sq \&"
+is taken as is.
+.It
+The backslash character 
+.Pq Sq \e
+escapes the next character, including new line characters, outside comments;
+as a result, comments may not be extended over multiple lines.
+.It
+If quotes is used in a word, it is not considered a keyword.
+.Pp
+.El
+.Sh FILES
+.Bl -tag -width /etc/examples/doas.conf -compact
+.It Pa /etc/doas.conf
+.Xr doas 1
+configuration file.
+.El 
+.Sh EXAMPLES
+The following example permits user aja to install packages from a preferred mirror;
+group wheel to execute commands as any user while keeping the environment
+variables 
+.Ev PS1
+and 
+.Ev SSH_AUTH_SOCK
+and unsetting 
+.Ev ENV ;
+permits tedu to run procmap as root without a password;
+and additionally permits root to run unrestricted commands as itself
+while retaining the original PATH.
+.Pp
+.Bd -literal -offset indent
+permit persist setenv { PKG_CACHE PKG_PATH } aja cmd pkg_add
+permit setenv { -ENV PS1=$DOAS_PS1 SSH_AUTH_SOCK } :wheel
+permit nopass tedu as root cmd /usr/sbin/procmap
+permit nopass keepenv setenv { PATH } root as root
+.Ed 
+.Sh SEE ALSO
+.Xr doas 1 ,
+.Xr syslogd 8
+.Sh HISTORY
+The 
+.Nm 
+configuration file first appeared in 
+.Ox 5.8 .
+.Pp
+This enhanced configuration file was created in 2026.
+.Sh AUTHORS
+.An Ted Unangst
+.Aq Mt tedu@openbsd.org
+.Bl -tag -compact -width 4n
+.It
+Author of the original 
+.Nm doas
+utility for 
+.Ox  .
+.Pp
+.El
+.An lhz07
+.Aq Mt lhz07c@gmail.com
+.Bl -tag -compact -width 4n
+.It
+Author of this enhanced Rust implementation.
+.Pp
+.El
+.Pp
+.Pp
+.Pp

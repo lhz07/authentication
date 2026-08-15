@@ -1,0 +1,176 @@
+.Dd $Mdocdate: May 28 2026 $
+.Dt DOAS 1
+.Os 
+.Sh NAME
+.Nm doas
+.Nd execute commands as another user
+.Sh SYNOPSIS
+.Nm doas
+.Op Fl Lns
+.Op Fl Cv Ar config
+.Op Fl u Ar user
+.Ar command
+.Op Ar args ...
+.Nm doas
+.Op Nm vidoas
+.Nm doas
+.Op Fl -version
+.Sh DESCRIPTION
+The 
+.Nm doas
+utility executes the given command as another user. The 
+.Ar command
+argument is mandatory unless 
+.Fl C ,
+.Fl L ,
+or 
+.Fl s
+is specified.
+.Pp
+The user will be required to authenticate by entering their password, unless configured otherwise.
+.Pp
+By default, a new environment is created. The variables 
+.Ev HOME ,
+.Ev LOGNAME ,
+.Ev PATH ,
+.Ev SHELL ,
+and 
+.Ev USER
+are set to values appropriate for the target user. 
+.Ev DOAS_USER
+is set to the name of the user executing 
+.Nm doas .
+The variables 
+.Ev DISPLAY
+and 
+.Ev TERM
+are inherited from the current environment. 
+.br 
+This behavior may be modified by the config file. The working directory is not changed.
+.Sh SUBCOMMANDS
+.Cm vidoas
+.Bl -tag -compact -width 4n
+.It
+Safely edit and check the doas.conf configuration file.
+.Pp
+.El
+.Sh OPTIONS
+.Fl -version
+.Bl -tag -compact -width 4n
+.It
+Print version information and exit.
+.Pp
+.El
+.Fl L
+.Bl -tag -compact -width 4n
+.It
+Clear any persisted authentications from previous invocations, then immediately exit. 
+.br 
+No command is executed.
+.Pp
+.El
+.Fl n
+.Bl -tag -compact -width 4n
+.It
+Non interactive mode, fail if the matching rule doesn't have the 
+.Ic nopass
+option.
+.Pp
+.El
+.Fl s
+.Bl -tag -compact -width 4n
+.It
+Execute the shell from 
+.Ev SHELL
+or 
+.Pa /etc/passwd .
+.Pp
+.El
+.Fl u
+.Ar user
+.Bl -tag -compact -width 4n
+.It
+Execute the command as 
+.Ar user .
+The default is root.
+.Pp
+.El
+.Fl C
+.Op Fl v
+.Ar config
+.Bl -tag -compact -width 4n
+.It
+Parse and check the configuration file 
+.Ar config ,
+then exit.
+.Pp
+.El
+.Bl -tag -compact -width 4n
+.It
+If the 
+.Fl v
+option is specified alongside 
+.Fl C ,
+verbose output will be enabled, printing the fully parsed configuration details to standard output.
+.Pp
+If 
+.Ar command
+is supplied, 
+.Nm doas
+will also perform command matching.
+In the latter case either 
+.Sq permit ,
+.Sq permit nopass
+or 
+.Sq deny
+will be printed on standard output, depending on command matching results. 
+.br 
+No command is executed.
+.Pp
+.El
+.Sh EXIT STATUS
+.Ex -std doas
+.br 
+It may fail for one of the following reasons:
+.Pp
+.Bl -bullet -compact
+.It
+The config file 
+.Pa /etc/doas.conf
+could not be parsed.
+.It
+The user attempted to run a command which is not permitted.
+.It
+The password was incorrect.
+.It
+The specified command was not found or is not executable.
+.Pp
+.El
+.Sh SEE ALSO
+.Xr su 1 ,
+.Xr doas.conf 5
+.Sh HISTORY
+The original 
+.Nm doas
+command first appeared in 
+.Ox 5.8 .
+.Pp
+This enhanced implementation was created in 2026.
+.Sh AUTHORS
+.An Ted Unangst
+.Aq Mt tedu@openbsd.org
+.Bl -tag -compact -width 4n
+.It
+Author of the original 
+.Nm doas
+utility for 
+.Ox  .
+.Pp
+.El
+.An lhz07
+.Aq Mt lhz07c@gmail.com
+.Bl -tag -compact -width 4n
+.It
+Author of this enhanced Rust implementation.
+.Pp
+.El
