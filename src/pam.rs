@@ -1,6 +1,8 @@
 use crate::{
+    CNAME,
     bindings::{self, pam_handle, pam_message, pam_response},
-    c, c_format, eprintf,
+    c::{self, PamErr},
+    c_format, eprintf,
     pass::read_passwd,
     syslog,
     utils::array::{Array, ArrayRef},
@@ -47,6 +49,7 @@ impl<'a> Drop for SafeBuf<'a> {
 struct PamData {
     pwfeedback: bool,
     doas_prompt: CString,
+    tried_password: bool,
 }
 
 unsafe extern "C" fn pamconv(
@@ -79,6 +82,12 @@ unsafe extern "C" fn pamconv(
                 let pass = match pam_prompt(prompt, pwfeedback) {
                     Ok(pass) => pass,
                     Err(e) => return e as i32,
+                };
+                unsafe {
+                    if !data.is_null() {
+                        let data = data as *mut PamData;
+                        (*data).tried_password = true;
+                    }
                 };
                 let rsp = pam_response {
                     resp: pass.as_ptr(),
@@ -153,7 +162,18 @@ impl Drop for PamResp {
     }
 }
 
-pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(), ()> {
+pub enum AuthErr {
+    Retry,
+    Failed,
+}
+
+impl From<()> for AuthErr {
+    fn from(_: ()) -> Self {
+        AuthErr::Retry
+    }
+}
+
+pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(), AuthErr> {
     let hostname = c::gethostname().map_or(c"?".into(), Cow::Owned);
     let name_bytes = myname.to_bytes();
     let hostname_bytes = hostname.to_bytes();
@@ -167,6 +187,7 @@ pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(
     let mut appdata = PamData {
         pwfeedback,
         doas_prompt,
+        tried_password: false,
     };
     let mut pam_guard = unsafe {
         let conv = bindings::pam_conv {
@@ -174,7 +195,7 @@ pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(
             appdata_ptr: &raw mut appdata as *mut _,
         };
         let mut pamh = ptr::null_mut();
-        c::pam_start(c"sudo", myname, &conv, &mut pamh)?;
+        c::pam_start(CNAME, myname, &conv, &mut pamh)?;
         PamGuard {
             pamh: &mut *pamh,
             sess: 0,
@@ -184,9 +205,21 @@ pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(
     if let Err(e) = c::pam_set_item(pam_guard.pamh, bindings::PAM_RUSER as i32, myname) {
         warnx!("pam_set_item(?, PAM_RUSER, {:?}): {:?}", myname, e);
     }
-    if c::pam_authenticate(pam_guard.pamh, 0).is_err() {
+    if let Err(e) = c::pam_authenticate(pam_guard.pamh, 0) {
         syslog!(LOG_AUTHPRIV | LOG_NOTICE, "failed auth for {}", myname);
-        return Err(());
+        match e {
+            PamErr::Auth => {
+                if appdata.tried_password {
+                    return Err(AuthErr::Retry);
+                } else {
+                    return Err(AuthErr::Failed);
+                }
+            }
+            PamErr::Other(str) => {
+                eprintf!("pam auth error: {}\n", str);
+                return Err(AuthErr::Failed);
+            }
+        }
     }
 
     // account not vaild or changing the auth token failed
@@ -199,7 +232,7 @@ pub fn pam_auth(target_user: &CStr, myname: &CStr, pwfeedback: bool) -> Result<(
             .is_err())
     {
         syslog!(LOG_AUTHPRIV | LOG_NOTICE, "failed auth for {}", myname);
-        return Err(());
+        return Err(AuthErr::Retry);
     }
     // set PAM_USER to the user we want to be
     if let Err(e) = c::pam_set_item(pam_guard.pamh, bindings::PAM_USER as i32, target_user) {

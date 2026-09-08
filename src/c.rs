@@ -320,8 +320,19 @@ pub fn pam_set_item<'a>(
     }
 }
 
-pub fn pam_authenticate(pamh: &mut pam_handle_t, flags: c_int) -> Result<(), ()> {
-    unsafe { bindings::pam_authenticate(pamh, flags).map_pam(|| ()) }
+pub enum PamErr<'a> {
+    Auth,
+    Other(&'a CStr),
+}
+
+pub fn pam_authenticate(pamh: &mut pam_handle_t, flags: c_int) -> Result<(), PamErr<'_>> {
+    let ret = unsafe { bindings::pam_authenticate(pamh, flags) };
+
+    match ret as u32 {
+        bindings::PAM_SUCCESS => Ok(()),
+        bindings::PAM_AUTH_ERR => Err(PamErr::Auth),
+        _ => Err(PamErr::Other(pam_strerror(pamh, ret))),
+    }
 }
 
 pub fn pam_acct_mgmt(pamh: &mut pam_handle_t, flags: c_int) -> Result<(), c_int> {

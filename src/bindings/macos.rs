@@ -243,6 +243,7 @@ pub struct pam_handle {
 pub type pam_handle_t = pam_handle;
 pub const PAM_SUCCESS: _bindgen_ty_4 = 0;
 pub const PAM_CONV_ERR: _bindgen_ty_4 = 6;
+pub const PAM_AUTH_ERR: _bindgen_ty_4 = 9;
 pub const PAM_NEW_AUTHTOK_REQD: _bindgen_ty_4 = 10;
 pub type _bindgen_ty_4 = ::std::os::raw::c_uint;
 pub const PAM_PROMPT_ECHO_OFF: _bindgen_ty_5 = 1;

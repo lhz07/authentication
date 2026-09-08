@@ -1,4 +1,7 @@
-use crate::{errx, insults, pam};
+use crate::{
+    errx, insults,
+    pam::{self, AuthErr},
+};
 use libc::uid_t;
 use std::ffi::CStr;
 
@@ -26,8 +29,10 @@ pub fn auth(
     // fall back to pam authentication
     for _ in 0..3 {
         let res = pam::pam_auth(target_user, myname, pwfeedback);
-        if res.is_ok() {
-            return res;
+        match res {
+            Ok(()) => return Ok(()),
+            Err(AuthErr::Failed) => break,
+            Err(AuthErr::Retry) => (),
         }
         if insult {
             eprintln!("{}", insults::get_an_insult());
